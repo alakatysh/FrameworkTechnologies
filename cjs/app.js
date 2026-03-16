@@ -1,19 +1,18 @@
- 
-const fastify  = require('fastify');
-const apiRoutes = require('./routes/api.routes');
+const fastify = require("fastify");
+const { routes: apiRoutes } = require("./routes/api.routes");
 
 function buildApp() {
   const app = fastify({ logger: true });
 
-  const config = require('./config/env');
-  config.port = 9999; 
+  const config = require("./config/env");
+  config.port = 9999;
 
-  const errorHandler = require('./plugins/error-handler');
+  const errorHandler = require("./plugins/error-handler");
   app.register(errorHandler);
 
-  app.get('/health', async () => ({ status: 'ok' }));
+  app.get("/health", async () => ({ status: "ok" }));
 
-  app.register(apiRoutes, { prefix: '/api' });
+  app.register(apiRoutes, { prefix: "/api" });
 
   return app;
 }
