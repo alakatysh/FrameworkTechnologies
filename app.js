@@ -1,9 +1,8 @@
-const { createServer } = require('node:http');
-const { PORT, HOSTNAME, NODE_ENV } = require('#config/config');
-const handleRoutes = require('#routes/router');
+import { createServer } from 'node:http';
+import { PORT, HOSTNAME, NODE_ENV } from '#config/config';
+import handleRoutes from '#routes/router';
 
 const server = createServer((req, res) => {
-  // Логування JSON
   res.on('finish', () => {
     const isError = res.statusCode >= 400;
     const logData = {
@@ -22,11 +21,9 @@ const server = createServer((req, res) => {
     }
   });
 
-  // Передаємо запит у наш роутер
   handleRoutes(req, res);
 });
 
-// Глобальні обробники та gracefulShutdown залишаються без змін
 const gracefulShutdown = (signal) => {
   console.log(`\nReceived ${signal}. Shutting down gracefully...`);
   setTimeout(() => {
@@ -70,7 +67,6 @@ process.on('unhandledRejection', (reason, promise) => {
   gracefulShutdown('unhandledRejection');
 });
 
-// Запуск сервера
 server.listen(PORT, HOSTNAME, () => {
   console.log(
     `Server is running on http://${HOSTNAME}:${PORT} in ${NODE_ENV} mode.`,

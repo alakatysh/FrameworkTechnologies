@@ -1,14 +1,5 @@
-const getHealth = (req, res) => {
+export const getHealth = (req, res) => {
   res.statusCode = 200;
-  return res.end(
-    JSON.stringify({
-      pid: process.pid,
-      nodeVersion: process.version,
-      platform: process.platform,
-      uptime: process.uptime(),
-      memoryUsage: process.memoryUsage(),
-    }),
-  );
+  res.setHeader('Content-Type', 'application/json');
+  res.end(JSON.stringify({ status: 'OK', uptime: process.uptime() }));
 };
-
-module.exports = { getHealth };

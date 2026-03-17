@@ -4,10 +4,10 @@ let INVENTORY = [
   { id: 3, name: 'Mouse', price: 50, qty: 30 },
 ];
 
-module.exports = {
-  getInventory: () => INVENTORY,
-  setInventory: (newData) => {
-    INVENTORY = newData;
-  },
-  addItem: (item) => INVENTORY.push(item),
+export const getInventory = () => INVENTORY;
+
+export const setInventory = (newData) => {
+  INVENTORY = newData;
 };
+
+export const addItem = (item) => INVENTORY.push(item);

@@ -1,5 +1,7 @@
-require('dotenv').config();
-const PORT = parseInt(process.env.PORT, 10);
+import 'dotenv/config';
+
+export const PORT = parseInt(process.env.PORT, 10);
+
 if (!PORT || isNaN(PORT) || PORT <= 1000 || PORT >= 65535) {
   console.error(
     JSON.stringify({
@@ -10,7 +12,7 @@ if (!PORT || isNaN(PORT) || PORT <= 1000 || PORT >= 65535) {
   process.exit(1);
 }
 
-const HOSTNAME = process.env.HOSTNAME;
+export const HOSTNAME = process.env.HOSTNAME;
 if (!HOSTNAME) {
   console.error(
     JSON.stringify({ error: 'Invalid HOSTNAME environment variable.' }),
@@ -18,7 +20,7 @@ if (!HOSTNAME) {
   process.exit(1);
 }
 
-const NODE_ENV = process.env.NODE_ENV;
+export const NODE_ENV = process.env.NODE_ENV;
 if (!NODE_ENV || !['development', 'production'].includes(NODE_ENV)) {
   console.error(
     JSON.stringify({
@@ -27,5 +29,3 @@ if (!NODE_ENV || !['development', 'production'].includes(NODE_ENV)) {
   );
   process.exit(1);
 }
-
-module.exports = { PORT, HOSTNAME, NODE_ENV };

@@ -1,6 +1,6 @@
-const { getInventory, setInventory, addItem } = require('#data/inventory.data');
+import { getInventory, setInventory, addItem } from '#data/inventory.data';
 
-const getItems = (req, res) => {
+export const getItems = (req, res) => {
   const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
   const minPriceRaw = parsedUrl.searchParams.get('minPrice');
   let results = [...getInventory()];
@@ -20,11 +20,12 @@ const getItems = (req, res) => {
   return res.end(JSON.stringify({ count: results.length, items: results }));
 };
 
-const createItem = (req, res) => {
+export const createItem = (req, res) => {
   let body = '';
   req.on('data', (chunk) => {
     body += chunk.toString();
   });
+
   req.on('end', () => {
     res.setHeader('Content-Type', 'application/json');
     try {
@@ -50,11 +51,12 @@ const createItem = (req, res) => {
   });
 };
 
-const updateItem = (req, res, id) => {
+export const updateItem = (req, res, id) => {
   let body = '';
   req.on('data', (chunk) => {
     body += chunk.toString();
   });
+
   req.on('end', () => {
     res.setHeader('Content-Type', 'application/json');
     const inventory = getInventory();
@@ -64,9 +66,10 @@ const updateItem = (req, res, id) => {
       res.statusCode = 404;
       return res.end(JSON.stringify({ error: 'Not Found' }));
     }
+
     try {
       const updates = JSON.parse(body);
-      delete updates.id;
+      delete updates.id; // Забороняємо змінювати ID
       inventory[index] = { ...inventory[index], ...updates };
       res.end(JSON.stringify({ message: 'Updated', item: inventory[index] }));
     } catch {
@@ -76,7 +79,7 @@ const updateItem = (req, res, id) => {
   });
 };
 
-const deleteItem = (req, res, id) => {
+export const deleteItem = (req, res, id) => {
   const inventory = getInventory();
   const originalLength = inventory.length;
 
@@ -91,5 +94,3 @@ const deleteItem = (req, res, id) => {
     }),
   );
 };
-
-module.exports = { getItems, createItem, updateItem, deleteItem };

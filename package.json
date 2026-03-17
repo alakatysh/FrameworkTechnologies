@@ -1,22 +1,7 @@
 {
   "name": "labs",
   "version": "1.0.0",
-  "description": "",
-  "homepage": "https://github.com/alakatysh/FrameworkTechnologies#readme",
-  "bugs": {
-    "url": "https://github.com/alakatysh/FrameworkTechnologies/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/alakatysh/FrameworkTechnologies.git"
-  },
-  "engines": {
-    "node": ">=24.14.0",
-    "npm": ">=11.9.0"
-  },
-  "license": "ISC",
-  "author": "",
-  "type": "commonjs",
+  "type": "module",
   "main": "app.js",
   "imports": {
     "#config/*": "./config/*.js",

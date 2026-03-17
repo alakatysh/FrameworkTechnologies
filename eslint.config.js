@@ -1,30 +1,35 @@
-const js = require('@eslint/js');
-const globals = require('globals');
-const config = require('eslint/config');
-const prettierPlugin = require('eslint-plugin-prettier');
-const eslintConfigPrettier = require('eslint-config-prettier');
+import js from '@eslint/js';
+import globals from 'globals';
+import prettierPlugin from 'eslint-plugin-prettier';
+import prettierConfig from 'eslint-config-prettier';
 
-module.exports = config.defineConfig([
+export default [
   {
-    ignores: ['node_modules/**', 'dist/**', 'coverage/**', '.vscode/**'],
+    ignores: ['node_modules/', 'dist/', 'tempCodeRunnerFile.js'],
   },
-
   js.configs.recommended,
-
   {
-    files: ['**/*.{js,mjs,cjs}'],
+    files: ['**/*.js'],
     languageOptions: {
-      globals: globals.node,
-      sourceType: 'commonjs',
       ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: {
+        ...globals.node,
+      },
     },
     plugins: {
       prettier: prettierPlugin,
     },
     rules: {
-      'prettier/prettier': ['warn'],
+      ...prettierConfig.rules,
+      'prettier/prettier': [
+        'error',
+        {
+          endOfLine: 'auto',
+        },
+      ],
+      'no-unused-vars': 'warn',
+      'no-console': 'off',
     },
   },
-
-  eslintConfigPrettier,
-]);
+];
