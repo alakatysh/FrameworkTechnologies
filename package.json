@@ -1,0 +1,52 @@
+{
+  "name": "labs",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/alakatysh/FrameworkTechnologies#readme",
+  "bugs": {
+    "url": "https://github.com/alakatysh/FrameworkTechnologies/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alakatysh/FrameworkTechnologies.git"
+  },
+  "engines": {
+    "node": ">=24.14.0",
+    "npm": ">=11.9.0"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "app.js",
+  "imports": {
+    "#config/*": "./config/*.js",
+    "#controllers/*": "./controllers/*.js",
+    "#data/*": "./data/*.js",
+    "#routes/*": "./routes/*.js",
+    "#validators/*": "./validators/*.js"
+  },
+  "scripts": {
+    "start": "node app.js",
+    "predev": "npm run check",
+    "dev": "nodemon app.js",
+    "check": "npm run lint && npm run format",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"**/*.{js,mjs,cjs,json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{js,mjs,cjs,json,md,yml,yaml}\"",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.0.3",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.5",
+    "globals": "^17.4.0",
+    "nodemon": "^3.1.14",
+    "prettier": "^3.8.1"
+  },
+  "dependencies": {
+    "ajv": "^8.18.0",
+    "dotenv": "^17.3.1"
+  }
+}
