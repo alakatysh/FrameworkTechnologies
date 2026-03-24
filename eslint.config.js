@@ -30,6 +30,7 @@ export default [
       ],
       'no-unused-vars': 'warn',
       'no-console': 'off',
+      'no-process-env': 'error',
     },
   },
 ];

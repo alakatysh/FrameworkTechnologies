@@ -1,74 +1,55 @@
-import { createServer } from 'node:http';
-import { PORT, HOSTNAME, NODE_ENV } from '#config/config';
-import handleRoutes from '#routes/router';
+import Fastify from 'fastify';
+import fastifyEnv from '@fastify/env';
+import fastifySensible from '@fastify/sensible';
+import fastifyCors from '@fastify/cors';
+import fastifyHelmet from '@fastify/helmet';
+import { envSchema } from '#schemas/env.schema.js';
+import { healthRoutes } from '#routes/health.routes.js';
+import { inventoryRoutes } from '#routes/inventory.routes.js';
 
-const server = createServer((req, res) => {
-  res.on('finish', () => {
-    const isError = res.statusCode >= 400;
-    const logData = {
-      timestamp: new Date().toISOString(),
-      level: isError ? 'ERROR' : 'INFO',
-      method: req.method,
-      url: req.url,
-      status: res.statusCode,
-    };
+export const buildApp = async () => {
+  // eslint-disable-next-line no-process-env
+  const isDev = process.env.NODE_ENV === 'development';
 
-    if (NODE_ENV === 'development') {
-      const logfn = isError ? console.error : console.log;
-      logfn(JSON.stringify(logData));
-    } else if (NODE_ENV === 'production' && isError) {
-      console.error(JSON.stringify(logData));
-    }
+  const fastify = Fastify({
+    logger: {
+      level: isDev ? 'info' : 'error',
+      transport: isDev ? { target: 'pino-pretty' } : undefined,
+    },
   });
 
-  handleRoutes(req, res);
-});
-
-const gracefulShutdown = (signal) => {
-  console.log(`\nReceived ${signal}. Shutting down gracefully...`);
-  setTimeout(() => {
-    console.error(
-      JSON.stringify({ error: 'Could not close connections in time' }),
-    );
-    process.exit(1);
-  }, 10000);
-
-  server.closeAllConnections();
-  server.close((err) => {
-    if (err) {
-      console.error(
-        JSON.stringify({ error: `Error during server close: ${err.message}` }),
-      );
-      process.exit(1);
-    }
-    console.log('Server closed successfully.');
-    process.exit(0);
+  await fastify.register(fastifyEnv, {
+    schema: envSchema,
+    dotenv: true,
   });
+
+  await fastify.register(fastifyHelmet, { global: true });
+
+  await fastify.register(fastifyCors, {
+    origin:
+      fastify.config.NODE_ENV === 'production' ? 'https://example.com' : '*',
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'PUT'],
+  });
+
+  await fastify.register(fastifySensible);
+
+  fastify.setErrorHandler((error, request, reply) => {
+    fastify.log.error(error);
+    const statusCode = error.statusCode || 500;
+
+    reply.status(statusCode).send({
+      statusCode,
+      error: error.name || 'Error',
+      message: error.message || 'Internal Server Error',
+    });
+  });
+
+  fastify.addHook('onClose', async (instance) => {
+    instance.log.info('Сервер успішно закрито (onClose hook)');
+  });
+
+  await fastify.register(healthRoutes);
+  await fastify.register(inventoryRoutes);
+
+  return fastify;
 };
-
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-
-process.on('uncaughtException', (err) => {
-  console.error(
-    JSON.stringify({
-      error: `Uncaught exception: ${err.message} \n${err.stack}`,
-    }),
-  );
-  gracefulShutdown('uncaughtException');
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error(
-    JSON.stringify({
-      error: `Unhandled rejection at: ${promise}, reason: ${reason}`,
-    }),
-  );
-  gracefulShutdown('unhandledRejection');
-});
-
-server.listen(PORT, HOSTNAME, () => {
-  console.log(
-    `Server is running on http://${HOSTNAME}:${PORT} in ${NODE_ENV} mode.`,
-  );
-});
