@@ -1,13 +1,11 @@
 import * as inventoryController from '#controllers/inventory.controller.js';
 import {
-  itemSchema,
   getItemsSchema,
   createItemSchema,
   paramsSchema,
 } from '#schemas/inventory.schema.js';
 
 export const inventoryRoutes = async (fastify) => {
-  fastify.addSchema(itemSchema);
   fastify.get(
     '/inventory',
     { schema: getItemsSchema },

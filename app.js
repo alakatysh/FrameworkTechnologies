@@ -3,9 +3,16 @@ import fastifyEnv from '@fastify/env';
 import fastifySensible from '@fastify/sensible';
 import fastifyCors from '@fastify/cors';
 import fastifyHelmet from '@fastify/helmet';
+import fastifyMultipart from '@fastify/multipart';
+import fastifyStatic from '@fastify/static';
+import path from 'node:path';
 import { envSchema } from '#schemas/env.schema.js';
+import { itemSchema } from '#schemas/inventory.schema.js';
 import { healthRoutes } from '#routes/health.routes.js';
 import { inventoryRoutes } from '#routes/inventory.routes.js';
+import { itemsRoutes } from '#routes/items.routes.js';
+import { createStartupBackup } from './src/utils/backup.js';
+import { isDataMigrationNeeded } from './src/migrations/migrate.js';
 
 export const buildApp = async () => {
   // eslint-disable-next-line no-process-env
@@ -33,6 +40,19 @@ export const buildApp = async () => {
 
   await fastify.register(fastifySensible);
 
+  fastify.addSchema(itemSchema);
+
+  await fastify.register(fastifyMultipart, {
+    limits: {
+      fileSize: 5 * 1024 * 1024,
+    },
+  });
+
+  await fastify.register(fastifyStatic, {
+    root: path.join(process.cwd(), 'uploads'),
+    prefix: '/uploads/',
+  });
+
   fastify.setErrorHandler((error, request, reply) => {
     fastify.log.error(error);
     const statusCode = error.statusCode || 500;
@@ -50,6 +70,17 @@ export const buildApp = async () => {
 
   await fastify.register(healthRoutes);
   await fastify.register(inventoryRoutes);
+  await fastify.register(itemsRoutes);
+
+  await createStartupBackup().catch((error) => {
+    fastify.log.error(error);
+  });
+
+  if (await isDataMigrationNeeded()) {
+    fastify.log.warn(
+      'Data schema changed. Run "npm run migrate" to update existing files.',
+    );
+  }
 
   return fastify;
 };
