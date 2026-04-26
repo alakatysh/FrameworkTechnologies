@@ -33,7 +33,7 @@ export const itemsRoutes = async (fastify) => {
   fastify.get('/items/export', inventoryController.exportItems);
 
   fastify.post('/items/import', inventoryController.importItems);
-
+  fastify.get('/items/:id/details', inventoryController.getItemDetails);
   fastify.post(
     '/items/:id/image',
     { schema: { params: paramsSchema } },

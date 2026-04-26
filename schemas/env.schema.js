@@ -10,5 +10,6 @@ export const envSchema = {
       default: 'development',
     },
     ADMIN_API_KEY: { type: 'string' },
+    GITHUB_TOKEN: { type: 'string' },
   },
 };

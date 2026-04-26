@@ -24,6 +24,11 @@ import {
   ensureDirectory,
 } from '../src/utils/file-system.js';
 import { importItemSchema } from '#schemas/inventory.schema.js';
+import {
+  fetchWithRetry,
+  getFromCache,
+  saveToCache,
+} from '../src/utils/external-api.js';
 
 const importValidator = new Ajv({
   allErrors: true,
@@ -202,4 +207,41 @@ export const uploadItemImage = async (request, reply) => {
     await deleteFileIfExists(destinationPath);
     throw error;
   }
+};
+
+export const getItemDetails = async (request, reply) => {
+  const { id } = request.params;
+  const item = await findItemById(id);
+
+  if (!item) {
+    throw reply.notFound(ERRORS.ITEM_NOT_FOUND);
+  }
+
+  let externalDetails = null;
+  const cacheKey = `category_${item.category}`;
+
+  const cachedData = await getFromCache(cacheKey);
+
+  if (cachedData) {
+    externalDetails = cachedData;
+    request.log.info('External data loaded from CACHE');
+  } else {
+    try {
+      request.log.info('Fetching from External JSON Server...');
+      const url = `http://localhost:3001/categories?name=${item.category}`;
+      const data = await fetchWithRetry(url);
+
+      if (data && data.length > 0) {
+        externalDetails = data[0];
+        await saveToCache(cacheKey, externalDetails);
+      }
+    } catch (error) {
+      request.log.error(`External Service Unavailable: ${error.message}`);
+    }
+  }
+
+  return reply.send({
+    ...toPublicItem(request, item),
+    externalDetails,
+  });
 };

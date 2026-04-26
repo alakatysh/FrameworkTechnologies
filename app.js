@@ -11,8 +11,14 @@ import { itemSchema } from '#schemas/inventory.schema.js';
 import { healthRoutes } from '#routes/health.routes.js';
 import { inventoryRoutes } from '#routes/inventory.routes.js';
 import { itemsRoutes } from '#routes/items.routes.js';
+import { githubV1Routes } from '#routes/v1/github.routes.js';
+import { githubV2Routes } from '#routes/v2/github.v2.routes.js';
 import { createStartupBackup } from './src/utils/backup.js';
 import { isDataMigrationNeeded } from './src/migrations/migrate.js';
+import inventoryV2Routes from '#routes/v2/inventory.v2.routes.js';
+import fastifyRateLimit from '@fastify/rate-limit';
+import fastifySwagger from '@fastify/swagger';
+import fastifySwaggerUi from '@fastify/swagger-ui';
 
 export const buildApp = async () => {
   // eslint-disable-next-line no-process-env
@@ -68,9 +74,44 @@ export const buildApp = async () => {
     instance.log.info('Сервер успішно закрито (onClose hook)');
   });
 
-  await fastify.register(healthRoutes);
-  await fastify.register(inventoryRoutes);
-  await fastify.register(itemsRoutes);
+  await fastify.register(fastifyRateLimit, {
+    max: 100,
+    timeWindow: '1 minute',
+    errorResponseBuilder: function (request, context) {
+      return {
+        statusCode: 429,
+        error: 'Too Many Requests',
+        message: `I limit exceeded, retry in ${context.after}`,
+      };
+    },
+  });
+
+  await fastify.register(fastifySwagger, {
+    openapi: {
+      info: {
+        title: 'Inventory API',
+        description: 'Документація REST API для Лабораторної роботи №6',
+        version: '1.0.0',
+      },
+      servers: [{ url: 'http://localhost:3000' }],
+    },
+  });
+
+  await fastify.register(fastifySwaggerUi, {
+    routePrefix: '/docs',
+    uiConfig: {
+      docExpansion: 'list',
+      deepLinking: false,
+    },
+  });
+
+  await fastify.register(healthRoutes, { prefix: '/api/v1' });
+  await fastify.register(inventoryRoutes, { prefix: '/api/v1' });
+  await fastify.register(itemsRoutes, { prefix: '/api/v1' });
+
+  await fastify.register(inventoryV2Routes, { prefix: '/api/v2' });
+  await fastify.register(githubV1Routes, { prefix: '/api/v1' });
+  await fastify.register(githubV2Routes, { prefix: '/api/v2' });
 
   await createStartupBackup().catch((error) => {
     fastify.log.error(error);
