@@ -1,6 +1,12 @@
 export const envSchema = {
   type: 'object',
-  required: ['PORT', 'HOSTNAME', 'NODE_ENV', 'ADMIN_API_KEY'],
+  required: [
+    'PORT',
+    'HOSTNAME',
+    'NODE_ENV',
+    'ADMIN_API_KEY',
+    'UAH_EXCHANGE_RATE',
+  ],
   properties: {
     PORT: { type: 'integer', default: 3000 },
     HOSTNAME: { type: 'string', default: '127.0.0.1' },
@@ -11,5 +17,6 @@ export const envSchema = {
     },
     ADMIN_API_KEY: { type: 'string' },
     GITHUB_TOKEN: { type: 'string' },
+    UAH_EXCHANGE_RATE: { type: 'number' },
   },
 };

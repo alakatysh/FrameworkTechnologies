@@ -31,9 +31,11 @@ export const itemsRoutes = async (fastify) => {
   );
 
   fastify.get('/items/export', inventoryController.exportItems);
-
+  fastify.get('/items/stream', inventoryController.streamItems);
   fastify.post('/items/import', inventoryController.importItems);
   fastify.get('/items/:id/details', inventoryController.getItemDetails);
+  fastify.get('/backups/:timestamp', inventoryController.downloadBackup);
+
   fastify.post(
     '/items/:id/image',
     { schema: { params: paramsSchema } },

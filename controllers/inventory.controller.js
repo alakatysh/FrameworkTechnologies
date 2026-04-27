@@ -1,17 +1,21 @@
 import { ERRORS } from '#constants/messages.js';
 import Ajv from 'ajv';
-import { createWriteStream } from 'node:fs';
+import { createWriteStream, createReadStream } from 'node:fs';
 import { pipeline } from 'node:stream/promises';
+import { Readable, Transform } from 'node:stream';
+import { access } from 'node:fs/promises';
 import path from 'node:path';
-import { stringify } from 'csv-stringify/sync';
 import { parse } from 'csv-parse/sync';
+import { eventBus } from '../src/utils/event-bus.js';
 import { ItemModel } from '../src/models/item.model.js';
+import { CurrencyTransform } from '../src/transforms/currency.transform.js';
 import {
   createItemRecord,
   deleteItemRecord,
   findAllItems,
   findItemById,
   updateItemRecord,
+  streamAllItemsRecords,
 } from '../src/repositories/item.repository.js';
 import {
   normalizeStoredImagePath,
@@ -49,9 +53,13 @@ export const getItems = async (request) => {
 
 export const createItem = async (request, reply) => {
   const itemToSave = await createItemRecord(request.body);
+  const publicItem = toPublicItem(request, itemToSave);
+
+  // Сповіщаємо WebSocket про створення
+  eventBus.emit('inventory_change', { event: 'created', data: publicItem });
 
   reply.code(201);
-  return { message: 'Created', item: toPublicItem(request, itemToSave) };
+  return { message: 'Created', item: publicItem };
 };
 
 export const updateItem = async (request, reply) => {
@@ -62,7 +70,12 @@ export const updateItem = async (request, reply) => {
     throw reply.notFound(ERRORS.ITEM_NOT_FOUND);
   }
 
-  return { message: 'Updated', item: toPublicItem(request, updatedItem) };
+  const publicItem = toPublicItem(request, updatedItem);
+
+  // Сповіщаємо WebSocket про оновлення
+  eventBus.emit('inventory_change', { event: 'updated', data: publicItem });
+
+  return { message: 'Updated', item: publicItem };
 };
 
 export const deleteItem = async (request, reply) => {
@@ -73,19 +86,44 @@ export const deleteItem = async (request, reply) => {
     throw reply.notFound(ERRORS.ITEM_NOT_FOUND);
   }
 
+  // Сповіщаємо WebSocket про видалення
+  eventBus.emit('inventory_change', { event: 'deleted', id: Number(id) });
+
   return { message: 'Deleted' };
 };
 
 export const exportItems = async (request, reply) => {
+  const { transform } = request.query;
+  const rate = request.server.config.UAH_EXCHANGE_RATE;
+
   const items = await findAllItems();
-  const csv = stringify(toPublicItems(request, items), {
-    header: true,
+  const publicItems = toPublicItems(request, items);
+
+  const sourceStream = Readable.from(publicItems);
+
+  const csvTransformer = new Transform({
+    objectMode: true,
+    transform(item, encoding, callback) {
+      const row = `${item.id},${item.name},${item.price},${item.category}\n`;
+      callback(null, row);
+    },
   });
 
   reply.header('Content-Disposition', 'attachment; filename="items.csv"');
   reply.type('text/csv; charset=utf-8');
 
-  return csv;
+  reply.raw.write('id,name,price,category\n');
+
+  if (transform === 'true') {
+    await pipeline(
+      sourceStream,
+      new CurrencyTransform(rate),
+      csvTransformer,
+      reply.raw,
+    );
+  } else {
+    await pipeline(sourceStream, csvTransformer, reply.raw);
+  }
 };
 
 export const importItems = async (request, reply) => {
@@ -244,4 +282,53 @@ export const getItemDetails = async (request, reply) => {
     ...toPublicItem(request, item),
     externalDetails,
   });
+};
+
+export const streamItems = async (request, reply) => {
+  const sourceStream = Readable.from(streamAllItemsRecords());
+
+  const ndjsonTransform = new Transform({
+    objectMode: true,
+    transform(item, encoding, callback) {
+      const publicItem = toPublicItem(request, item);
+      const ndjsonLine = JSON.stringify(publicItem) + '\n';
+      callback(null, ndjsonLine);
+    },
+  });
+
+  reply.type('application/x-ndjson');
+  return reply.send(sourceStream.pipe(ndjsonTransform));
+};
+
+// ПУНКТ 6: Скачування бекапу
+export const downloadBackup = async (request, reply) => {
+  const { timestamp } = request.params;
+  const apiKey = request.headers['x-api-key'];
+
+  // Перевірка API ключа
+  if (apiKey !== request.server.config.ADMIN_API_KEY) {
+    throw reply.unauthorized('Invalid API Key');
+  }
+
+  const filePath = path.join(
+    process.cwd(),
+    'data',
+    'backups',
+    `${timestamp}.gz`,
+  );
+
+  try {
+    await access(filePath);
+    const stream = createReadStream(filePath);
+
+    reply.type('application/gzip');
+    reply.header(
+      'Content-Disposition',
+      `attachment; filename="${timestamp}.gz"`,
+    );
+
+    return reply.send(stream);
+  } catch (error) {
+    throw reply.notFound('Backup file not found');
+  }
 };

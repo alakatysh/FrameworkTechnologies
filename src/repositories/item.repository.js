@@ -9,6 +9,7 @@ import {
   ITEMS_DIR,
 } from '../utils/file-system.js';
 import { normalizeStoredImagePath } from '../utils/item-url.js';
+import { opendir, readFile } from 'node:fs/promises';
 
 const getItemFilePath = (id) => path.join(ITEMS_DIR, `${id}.json`);
 const getItemTmpFilePath = (id) => path.join(ITEMS_DIR, `${id}.tmp.json`);
@@ -116,3 +117,14 @@ export const deleteItemRecord = async (id) => {
   await deleteFileIfExists(getItemFilePath(id));
   return true;
 };
+
+export async function* streamAllItemsRecords() {
+  const dir = await opendir(ITEMS_DIR);
+  for await (const dirent of dir) {
+    if (dirent.isFile() && dirent.name.endsWith('.json')) {
+      const filePath = path.join(ITEMS_DIR, dirent.name);
+      const fileContent = await readFile(filePath, 'utf8');
+      yield JSON.parse(fileContent);
+    }
+  }
+}

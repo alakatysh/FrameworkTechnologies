@@ -13,24 +13,26 @@ export const getFromCache = async (key, ttlSeconds = 120) => {
 
     const now = Date.now();
     if (now - item.timestamp > ttlSeconds * 1000) {
-      return null; // Час життя кешу вийшов
+      return null;
     }
     return item.data;
-  } catch (err) {
-    return null; // Файлу ще немає або він пустий
+  } catch {
+    return null;
   }
 };
 
 export const saveToCache = async (key, data) => {
   try {
     const dir = path.dirname(CACHE_FILE);
-    await fs.mkdir(dir, { recursive: true }); // Створюємо папку, якщо немає
+    await fs.mkdir(dir, { recursive: true });
 
     let cache = {};
     try {
       const existingData = await fs.readFile(CACHE_FILE, 'utf8');
       cache = JSON.parse(existingData);
-    } catch (e) {}
+    } catch {
+      return null;
+    }
 
     cache[key] = {
       timestamp: Date.now(),
@@ -45,13 +47,12 @@ export const saveToCache = async (key, data) => {
 
 export const fetchWithRetry = async (url, retries = 3) => {
   for (let attempt = 0; attempt < retries; attempt++) {
-    // AbortController для Timeout 5 секунд
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
     try {
       const response = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeoutId); // Очищаємо таймер, якщо встигли
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`HTTP Error: ${response.status}`);

@@ -52,7 +52,7 @@ export const getSharedReposV1 = async (request, reply) => {
             }
             repoCounts[r.full_name].shared_contributors++;
           });
-        } catch (e) {
+        } catch {
           request.log.error(`Failed to fetch repos for ${contributor.login}`);
         }
       }),

@@ -5,24 +5,31 @@ import fastifyCors from '@fastify/cors';
 import fastifyHelmet from '@fastify/helmet';
 import fastifyMultipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
+import fastifyWebsocket from '@fastify/websocket';
 import path from 'node:path';
-import { envSchema } from '#schemas/env.schema.js';
-import { itemSchema } from '#schemas/inventory.schema.js';
-import { healthRoutes } from '#routes/health.routes.js';
-import { inventoryRoutes } from '#routes/inventory.routes.js';
-import { itemsRoutes } from '#routes/items.routes.js';
-import { githubV1Routes } from '#routes/v1/github.routes.js';
-import { githubV2Routes } from '#routes/v2/github.v2.routes.js';
-import { createStartupBackup } from './src/utils/backup.js';
+
+// Імпорти схем
+import { envSchema } from './schemas/env.schema.js';
+import { itemSchema } from './schemas/inventory.schema.js';
+
+// Імпорти маршрутів
+import { healthRoutes } from './routes/health.routes.js';
+import { inventoryRoutes } from './routes/inventory.routes.js';
+import { itemsRoutes } from './routes/items.routes.js';
+import { wsRoutes } from './routes/ws.routes.js';
+import { githubV1Routes } from './routes/v1/github.routes.js';
+import { githubV2Routes } from './routes/v2/github.v2.routes.js';
+import inventoryV2Routes from './routes/v2/inventory.v2.routes.js';
+
+// Імпорти сервісів та утиліт
 import { isDataMigrationNeeded } from './src/migrations/migrate.js';
-import inventoryV2Routes from '#routes/v2/inventory.v2.routes.js';
+import { createGzipBackup } from './src/services/backup.service.js';
 import fastifyRateLimit from '@fastify/rate-limit';
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 
 export const buildApp = async () => {
-  // eslint-disable-next-line no-process-env
-  const isDev = process.env.NODE_ENV === 'development';
+  const isDev = process.env.NODE_ENV === 'development'; // eslint-disable-line no-process-env
 
   const fastify = Fastify({
     logger: {
@@ -31,27 +38,30 @@ export const buildApp = async () => {
     },
   });
 
+  // 1. Конфігурація (завжди першою)
   await fastify.register(fastifyEnv, {
     schema: envSchema,
     dotenv: true,
   });
 
+  // 2. Базові плагіни безпеки
   await fastify.register(fastifyHelmet, { global: true });
-
   await fastify.register(fastifyCors, {
-    origin:
-      fastify.config.NODE_ENV === 'production' ? 'https://example.com' : '*',
+    origin: '*',
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'PUT'],
   });
 
-  await fastify.register(fastifySensible);
+  // 3. WEBSOCKET - Реєструємо плагін та маршрут в одному блоці
+  // Це гарантує, що маршрут /ws точно бачитиме функціонал сокетів
+  await fastify.register(fastifyWebsocket);
+  await fastify.register(wsRoutes, { prefix: '/api/v1' });
 
+  // 4. Додаткові системні плагіни
+  await fastify.register(fastifySensible);
   fastify.addSchema(itemSchema);
 
   await fastify.register(fastifyMultipart, {
-    limits: {
-      fileSize: 5 * 1024 * 1024,
-    },
+    limits: { fileSize: 5 * 1024 * 1024 },
   });
 
   await fastify.register(fastifyStatic, {
@@ -59,10 +69,10 @@ export const buildApp = async () => {
     prefix: '/uploads/',
   });
 
+  // 5. Глобальна обробка помилок
   fastify.setErrorHandler((error, request, reply) => {
     fastify.log.error(error);
     const statusCode = error.statusCode || 500;
-
     reply.status(statusCode).send({
       statusCode,
       error: error.name || 'Error',
@@ -70,27 +80,16 @@ export const buildApp = async () => {
     });
   });
 
-  fastify.addHook('onClose', async (instance) => {
-    instance.log.info('Сервер успішно закрито (onClose hook)');
-  });
-
+  // 6. Обмеження запитів та документація
   await fastify.register(fastifyRateLimit, {
     max: 100,
     timeWindow: '1 minute',
-    errorResponseBuilder: function (request, context) {
-      return {
-        statusCode: 429,
-        error: 'Too Many Requests',
-        message: `I limit exceeded, retry in ${context.after}`,
-      };
-    },
   });
 
   await fastify.register(fastifySwagger, {
     openapi: {
       info: {
         title: 'Inventory API',
-        description: 'Документація REST API для Лабораторної роботи №6',
         version: '1.0.0',
       },
       servers: [{ url: 'http://localhost:3000' }],
@@ -99,28 +98,23 @@ export const buildApp = async () => {
 
   await fastify.register(fastifySwaggerUi, {
     routePrefix: '/docs',
-    uiConfig: {
-      docExpansion: 'list',
-      deepLinking: false,
-    },
   });
 
+  // 7. РЕЄСТРАЦІЯ РЕШТИ МАРШРУТІВ
   await fastify.register(healthRoutes, { prefix: '/api/v1' });
   await fastify.register(inventoryRoutes, { prefix: '/api/v1' });
   await fastify.register(itemsRoutes, { prefix: '/api/v1' });
-
   await fastify.register(inventoryV2Routes, { prefix: '/api/v2' });
   await fastify.register(githubV1Routes, { prefix: '/api/v1' });
   await fastify.register(githubV2Routes, { prefix: '/api/v2' });
 
-  await createStartupBackup().catch((error) => {
-    fastify.log.error(error);
+  // 8. Запуск бекапу та перевірка міграцій
+  await createGzipBackup().catch((error) => {
+    fastify.log.error('Backup error:', error);
   });
 
   if (await isDataMigrationNeeded()) {
-    fastify.log.warn(
-      'Data schema changed. Run "npm run migrate" to update existing files.',
-    );
+    fastify.log.warn('Data schema changed. Run migration.');
   }
 
   return fastify;
